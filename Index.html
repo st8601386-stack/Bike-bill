@@ -98,8 +98,12 @@
 
 <script>
   let items = [];
-  let billHistory = [];
-  let billCounter = 1;
+  let billHistory = JSON.parse(localStorage.getItem('billHistory')) || [];
+  let billCounter = billHistory.length > 0 ? billHistory[billHistory.length - 1].id + 1 : 1;
+
+  window.onload = () => {
+    renderHistory();
+  };
 
   function addItem() {
     let tbody = document.querySelector("#itemsTable tbody");
@@ -147,6 +151,8 @@
       customer: { name: custName, phone: custPhone, vehicle: vehicleNo }
     };
     billHistory.push(bill);
+    localStorage.setItem('billHistory', JSON.stringify(billHistory));
+
     renderHistory();
     showInvoiceModal(bill);
     items=[];
@@ -177,7 +183,6 @@
     let bill = typeof billOrId==='object'? billOrId : billHistory.find(b=>b.id===billOrId);
     if(!bill) return;
     let html = `
-      
       <h3>Invoice - Beeru Bike Point</h3>
       <div class="customer-info">
         <div><strong>Customer:</strong> ${bill.customer.name}<br><strong>Phone:</strong> ${bill.customer.phone||'-'}</div>
@@ -212,7 +217,12 @@
   }
 
   function closeModal(){ document.getElementById('invoiceModal').classList.remove('open'); }
-  function deleteBill(id){ billHistory=billHistory.filter(b=>b.id!==id); renderHistory(); }
+
+  function deleteBill(id){ 
+    billHistory=billHistory.filter(b=>b.id!==id); 
+    localStorage.setItem('billHistory', JSON.stringify(billHistory));
+    renderHistory(); 
+  }
 </script>
 
 </body>
