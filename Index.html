@@ -65,6 +65,16 @@
     tbody tr:hover{ background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 9999px rgba(91,140,255,.03); }
     .right{ text-align:right; } .center{ text-align:center; }
     footer{ text-align:center; color:var(--muted); padding:24px 10px; }
+
+    /* Toast */
+    .toast{
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,.65); color:#fff; padding:10px 14px; border-radius:999px;
+      font-size:13px; letter-spacing:.2px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      opacity:0; pointer-events:none; transition: opacity .25s, transform .25s;
+    }
+    .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+
     @media (max-width: 900px){ .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 640px){ .grid{ grid-template-columns: 1fr; } }
   </style>
@@ -148,14 +158,18 @@
     <footer>© 2025 Beeru Bike Point • Cloud Billing</footer>
   </div>
 
+  <div class="toast" id="toast"></div>
+
   <!-- Firebase + App -->
   <script type="module">
-    /* ======= SHOP INFO (easy to edit) ======= */
+    /* ======= SHOP & UPI ======= */
     const SHOP = {
       name: "Beeru Bike Point",
       address: "Near Main Bazaar, Rampur, Uttar Pradesh - 244901",
       phone: "+91 9876543210",
-      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Motorcycle_icon.svg/512px-Motorcycle_icon.svg.png"
+      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Motorcycle_icon.svg/512px-Motorcycle_icon.svg.png",
+      upiId: "7208386748-2@ybl",
+      upiName: "Beeru Bike Point"
     };
     document.getElementById("shopLogo").src = SHOP.logoUrl;
     document.getElementById("shopAddress").textContent = SHOP.address + " • " + SHOP.phone;
@@ -190,10 +204,16 @@
     const addItemBtn   = document.getElementById("addItemBtn");
     const genBillBtn   = document.getElementById("genBillBtn");
     const grandTotalEl = document.getElementById("grandTotal");
+    const toastEl      = document.getElementById("toast");
 
     /* ===== Utilities ===== */
     const currency = (n)=> Number(n||0).toFixed(2);
     const nowString = ()=> new Date().toLocaleString();
+    const showToast = (msg)=>{
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      setTimeout(()=> toastEl.classList.remove("show"), 1600);
+    };
 
     function calcGrandTotal(){
       const t = items.reduce((s,it)=> s + (Number(it.qty||0)*Number(it.rate||0)), 0);
@@ -276,6 +296,13 @@
       }
     }
 
+    /* ===== Invoice HTML (with UPI QR) ===== */
+    function makeUpiQrUrl(amount, billId){
+      const upiLink = `upi://pay?pa=${encodeURIComponent(SHOP.upiId)}&pn=${encodeURIComponent(SHOP.upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent("Invoice #"+billId)}`;
+      // Using free QR server (no auth)
+      return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}`;
+    }
+
     function billToHTML(bill){
       const itemsHTML = bill.items.map((it,i)=>`
         <tr>
@@ -287,6 +314,7 @@
         </tr>
       `).join('');
       const cust = bill.customer || {};
+      const qrUrl = makeUpiQrUrl(bill.total, bill.id);
       return `
         <div style="display:flex; gap:12px; align-items:center; margin-bottom:6px;">
           <img src="${SHOP.logoUrl}" alt="logo" style="width:54px; height:54px; border-radius:12px; object-fit:cover;"/>
@@ -295,18 +323,32 @@
             <div style="font-size:12px; color:#666">${SHOP.address} • ${SHOP.phone}</div>
           </div>
         </div>
+
         <div style="display:flex; gap:12px; flex-wrap:wrap; margin:10px 0 14px; font-size:14px;">
-          <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-            <strong>Customer:</strong> ${cust.name||"-"}<br/><span style="color:#666">Phone:</span> ${cust.phone||'-'}
+          <div style="flex:2 1 320px; display:flex; gap:12px; flex-wrap:wrap;">
+            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
+              <strong>Customer:</strong> ${cust.name||"-"}<br/><span style="color:#666">Phone:</span> ${cust.phone||'-'}
+            </div>
+            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
+              <strong>Vehicle:</strong> ${cust.vehicle||'-'}<br/><span style="color:#666">Model:</span> ${cust.model||'-'}
+            </div>
+            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
+              <strong>Bill No:</strong> ${bill.id}<br/><span style="color:#666">Date:</span> ${bill.date}
+            </div>
+            <div style="flex:1 1 100%; border:1px solid #eee; border-radius:10px; padding:8px;">
+              <strong>Address:</strong> ${cust.address||'-'} | <strong>Notes:</strong> ${cust.notes||'-'}
+            </div>
           </div>
-          <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-            <strong>Vehicle:</strong> ${cust.vehicle||'-'}<br/><span style="color:#666">Model:</span> ${cust.model||'-'}
-          </div>
-          <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-            <strong>Bill No:</strong> ${bill.id}<br/><span style="color:#666">Date:</span> ${bill.date}
+
+          <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px; text-align:center;">
+            <div style="font-weight:700; margin-bottom:6px;">Pay via UPI</div>
+            <img src="${qrUrl}" alt="UPI QR" style="width:200px; height:200px;"/>
+            <div style="font-size:12px; margin-top:6px;">
+              <div><strong>UPI:</strong> ${SHOP.upiId}</div>
+              <div><strong>Amount:</strong> ₹${bill.total}</div>
+            </div>
           </div>
         </div>
-        <div style="margin:4px 0 10px; font-size:12px; color:#444"><strong>Address:</strong> ${cust.address||'-'} | <strong>Notes:</strong> ${cust.notes||'-'}</div>
 
         <table style="width:100%; border-collapse: collapse;">
           <thead>
@@ -330,10 +372,9 @@
       `;
     }
 
-    function openInvoiceWindow(bill){
-      // Open synchronously to avoid popup block
+    function openInvoiceWindowAndRender(bill){
       const w = window.open('', '', 'width=900,height=700');
-      if(!w){ alert("Popup blocked! Please allow popups for this site."); return; }
+      if(!w){ alert("Popup blocked! Please allow popups for this site."); return null; }
       const html = `
         <html>
           <head>
@@ -353,10 +394,8 @@
             </div>
           </body>
         </html>`;
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
+      w.document.open(); w.document.write(html); w.document.close(); w.focus();
+      return w;
     }
 
     /* ===== Events ===== */
@@ -373,7 +412,7 @@
       if(vBtn){
         const id = Number(vBtn.dataset.id);
         const bill = billsCache.find(x => Number(x.id) === id);
-        if(bill) openInvoiceWindow(bill);
+        if(bill) openInvoiceWindowAndRender(bill);
       } else if(dBtn){
         const docId = dBtn.dataset.doc;
         if(confirm("Delete this bill?")){
@@ -384,8 +423,8 @@
       }
     });
 
-    // FIXED: Generate handler opens invoice window synchronously, then saves & renders
-    genBillBtn.addEventListener("click", async ()=>{
+    // Instant invoice + background save
+    genBillBtn.addEventListener("click", ()=>{
       const custName = document.getElementById('custName').value.trim();
       const custPhone= document.getElementById('custPhone').value.trim();
       const custAddr = document.getElementById('custAddr').value.trim();
@@ -398,75 +437,48 @@
 
       const total = calcGrandTotal();
 
-      // Prepare bill
       const bill = {
-        id: nextBillId, // assign current id (increment after save)
+        id: nextBillId, // reserve this id
         date: nowString(),
         total: currency(total),
         items: items.map(it => ({ particular:it.particular, qty:Number(it.qty)||0, rate:Number(it.rate)||0 })),
         customer: { name:custName, phone:custPhone, address:custAddr, model:bikeModel, vehicle:vehicleNo, notes }
       };
 
-      // Open print window NOW (to prevent popup blocker)
-      const printWin = window.open('', '', 'width=900,height=700');
-      if(!printWin){ alert("Popup blocked! Please allow popups for this site."); return; }
-      printWin.document.write("<html><head><title>Generating invoice...</title></head><body>Preparing invoice...</body></html>");
-      printWin.document.close();
+      // 1) Show invoice immediately
+      const win = openInvoiceWindowAndRender(bill);
+      // 2) Reset UI immediately for snappy feel
+      document.getElementById('custName').value='';
+      document.getElementById('custPhone').value='';
+      document.getElementById('custAddr').value='';
+      document.getElementById('bikeModel').value='';
+      document.getElementById('vehicleNo').value='';
+      document.getElementById('serviceNotes').value='';
+      clearItemTable();
 
-      try{
-        // Save to Firestore
-        await addDoc(collection(db, "bills"), bill);
-        nextBillId += 1; // increment next id only after save success
-        // Reset UI
-        document.getElementById('custName').value='';
-        document.getElementById('custPhone').value='';
-        document.getElementById('custAddr').value='';
-        document.getElementById('bikeModel').value='';
-        document.getElementById('vehicleNo').value='';
-        document.getElementById('serviceNotes').value='';
-        clearItemTable();
-
-        // Refresh history
+      // 3) Save in background (no waiting)
+      showToast("Saving bill…");
+      addDoc(collection(db, "bills"), bill).then(async ()=>{
+        nextBillId += 1;
         await loadHistory();
-
-        // Render invoice into the already-opened window
-        const html = `
-          <html>
-            <head>
-              <title>Invoice #${bill.id} — ${SHOP.name}</title>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-              <style>
-                body{ font-family:Arial, sans-serif; padding:16px; }
-                @media print{ button{ display:none } }
-                table{ width:100%; border-collapse:collapse; }
-                th,td{ border:1px solid #ddd; }
-              </style>
-            </head>
-            <body>
-              ${billToHTML(bill)}
-              <div style="margin-top:12px;">
-                <button onclick="window.print()">🖨 Print</button>
-              </div>
-            </body>
-          </html>`;
-        printWin.document.open();
-        printWin.document.write(html);
-        printWin.document.close();
-        printWin.focus();
-      } catch(err){
+        showToast("Saved ✓");
+      }).catch(err=>{
         console.error(err);
-        alert("Bill save failed. Check internet/Firebase rules.");
-        // Close the placeholder window if save failed
-        printWin.close();
-      }
+        showToast("Save failed!");
+        if(win) {
+          try { win.alert("Bill save failed! Check internet/Firebase rules."); } catch(_){}
+        } else {
+          alert("Bill save failed! Check internet/Firebase rules.");
+        }
+      });
     });
 
-    /* ===== Boot (wrapped to avoid old-browser top-level await issues) ===== */
+    /* ===== Boot ===== */
     (async function boot(){
       await setNextBillId();
       await loadHistory();
       // Ensure at least one row present for quick entry
-      if(items.length===0) document.getElementById("addItemBtn").click();
+      if(items.length===0) addItemBtn.click();
     })();
   </script>
 </body>
