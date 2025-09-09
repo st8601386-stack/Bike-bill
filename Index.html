@@ -56,6 +56,7 @@
     .btn.success{ background: linear-gradient(90deg, rgba(46,230,166,.95), rgba(0,224,255,.9)); box-shadow: 0 0 18px rgba(46,230,166,.45); color:#001713; }
     .btn.secondary{ background: linear-gradient(90deg, rgba(91,140,255,.95), rgba(0,224,255,.9)); box-shadow:0 0 18px rgba(91,140,255,.4); }
     .btn.danger{ background: linear-gradient(90deg, rgba(255,77,109,.95), rgba(255,122,150,.9)); color:#2b0010; box-shadow:0 0 18px rgba(255,77,109,.35); }
+    .btn.edit{ background: linear-gradient(90deg, rgba(255, 184, 0, 0.95), rgba(255, 220, 0, 0.9)); color:#2b2300; box-shadow:0 0 18px rgba(255, 184, 0, 0.35); }
     .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
     .sum{ margin-left:auto; font-weight:800; }
     table{ width:100%; border-collapse: collapse; overflow:hidden; border-radius:16px; }
@@ -74,6 +75,54 @@
       opacity:0; pointer-events:none; transition: opacity .25s, transform .25s;
     }
     .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: var(--bg2);
+      border-radius: 20px;
+      padding: 24px;
+      width: 90%;
+      max-width: 600px;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 30px rgba(0,224,255,0.3);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-title {
+      margin: 0;
+      font-size: 22px;
+    }
+    .close-modal {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
 
     @media (max-width: 900px){ .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 640px){ .grid{ grid-template-columns: 1fr; } }
@@ -155,6 +204,23 @@
     <footer>© 2025 Beeru Bike Point • Cloud Billing</footer>
   </div>
 
+  <!-- Edit Bill Modal -->
+  <div class="modal" id="editBillModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Bill #<span id="editBillId"></span></h3>
+        <button class="close-modal" id="closeEditModal">&times;</button>
+      </div>
+      <div id="editBillContent">
+        <!-- Content will be dynamically inserted here -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn danger" id="cancelEdit">Cancel</button>
+        <button class="btn success" id="saveEditedBill">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <!-- Firebase + App -->
@@ -162,7 +228,7 @@
     /* ======= SHOP & UPI ======= */
     const SHOP = {
       name: "Beeru Bike Point",
-      address: "Gautewadi, Digha Naka, Nr. Empire Tower, Thane Belapur Road, Navi Mumbai-400708",
+      address: "Gautewadi, Diga Naka, Nr. Empire Tower, Thane Belapur Road, Navi Mumbai-400708",
       phone: "+91 9867133048/9004191922",
       logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Motorcycle_icon.svg/512px-Motorcycle_icon.svg.png",
       upiId: "7208386748-2@ybl",
@@ -173,7 +239,7 @@
 
     /* ===== Firebase SDKs ===== */
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, orderBy, query, limit } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, orderBy, query, limit, updateDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
     /* ===== Your Firebase Config (as provided) ===== */
     const firebaseConfig = {
@@ -194,6 +260,7 @@
     let items = [];
     let billsCache = [];
     let nextBillId = 1;
+    let currentlyEditingBill = null;
 
     /* ===== Elements ===== */
     const tbodyItems   = document.querySelector("#itemsTable tbody");
@@ -202,6 +269,29 @@
     const genBillBtn   = document.getElementById("genBillBtn");
     const grandTotalEl = document.getElementById("grandTotal");
     const toastEl      = document.getElementById("toast");
+    const editBillModal = document.getElementById("editBillModal");
+    const editBillContent = document.getElementById("editBillContent");
+    const editBillIdEl = document.getElementById("editBillId");
+    const closeEditModal = document.getElementById("closeEditModal");
+    const cancelEdit = document.getElementById("cancelEdit");
+    const saveEditedBill = document.getElementById("saveEditedBill");
+
+    /* ===== Local Storage Functions ===== */
+    function saveBillsToLocalStorage() {
+      localStorage.setItem('beeruBikeBills', JSON.stringify(billsCache));
+    }
+
+    function loadBillsFromLocalStorage() {
+      const savedBills = localStorage.getItem('beeruBikeBills');
+      if (savedBills) {
+        try {
+          billsCache = JSON.parse(savedBills);
+          renderHistoryTable();
+        } catch (e) {
+          console.error('Error loading bills from localStorage:', e);
+        }
+      }
+    }
 
     /* ===== Utilities ===== */
     const currency = (n)=> Number(n||0).toFixed(2);
@@ -220,18 +310,18 @@
     function rerenderSr(){
       [...tbodyItems.querySelectorAll("tr")].forEach((tr,i)=> tr.querySelector("td").textContent = i+1);
     }
-    function makeInputRow(index){
+    function makeInputRow(index, particular = "", qty = 1, rate = 0){
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="center">${index+1}</td>
-        <td><input type="text" placeholder="Particular" /></td>
-        <td class="center"><input type="number" min="1" value="1"/></td>
-        <td class="right"><input type="number" min="0" step="0.01" value="0"/></td>
-        <td class="right amt">0.00</td>
+        <td><input type="text" placeholder="Particular" value="${particular}" /></td>
+        <td class="center"><input type="number" min="1" value="${qty}"/></td>
+        <td class="right"><input type="number" min="0" step="0.01" value="${rate}"/></td>
+        <td class="right amt">${currency(qty * rate)}</td>
         <td class="center"><button class="btn danger btn-del">Delete</button></td>
       `;
       // setup state + bindings
-      items[index] = { particular:"", qty:1, rate:0 };
+      items[index] = { particular, qty, rate };
       const [partI, qtyI, rateI] = tr.querySelectorAll("input");
       const amtTd = tr.querySelector(".amt");
 
@@ -254,8 +344,6 @@
         calcGrandTotal();
       });
 
-      // initial amount compute
-      recalc();
       return tr;
     }
     function clearItemTable(){
@@ -268,15 +356,22 @@
     async function setNextBillId(){
       const q = query(collection(db, "bills"), orderBy("id","desc"), limit(1));
       const snap = await getDocs(q);
-      if(!snap.empty){ nextBillId = (Number(snap.docs[0].data().id)||0)+1; }
-      else nextBillId = 1;
+      if(!snap.empty){ 
+        nextBillId = (Number(snap.docs[0].data().id)||0)+1; 
+      } else {
+        // Check localStorage for bills if Firebase is empty
+        const localBills = JSON.parse(localStorage.getItem('beeruBikeBills') || '[]');
+        if (localBills.length > 0) {
+          const maxId = Math.max(...localBills.map(bill => Number(bill.id) || 0));
+          nextBillId = maxId + 1;
+        } else {
+          nextBillId = 1;
+        }
+      }
     }
-    async function loadHistory(){
+    
+    function renderHistoryTable() {
       tbodyHistory.innerHTML = "";
-      billsCache = [];
-      const q = query(collection(db, "bills"), orderBy("id","desc")); // latest first
-      const snap = await getDocs(q);
-      snap.forEach(d => billsCache.push({ _id:d.id, ...d.data() }));
       for(const b of billsCache){
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -286,11 +381,32 @@
           <td class="right">₹${b.total}</td>
           <td class="center">
             <button class="btn secondary btn-view" data-id="${b.id}">View</button>
-            <button class="btn danger btn-del-bill" data-doc="${b._id}">Delete</button>
+            <button class="btn edit btn-edit" data-id="${b.id}">Edit</button>
+            <button class="btn danger btn-del-bill" data-doc="${b._id || b.localId}">Delete</button>
           </td>
         `;
         tbodyHistory.appendChild(tr);
       }
+    }
+    
+    async function loadHistory(){
+      billsCache = [];
+      
+      // Try to load from Firebase first
+      try {
+        const q = query(collection(db, "bills"), orderBy("id","desc")); // latest first
+        const snap = await getDocs(q);
+        snap.forEach(d => billsCache.push({ _id:d.id, ...d.data() }));
+        
+        // Save to localStorage as backup
+        saveBillsToLocalStorage();
+      } catch (error) {
+        console.error("Error loading from Firebase, using localStorage:", error);
+        // If Firebase fails, load from localStorage
+        loadBillsFromLocalStorage();
+      }
+      
+      renderHistoryTable();
     }
 
     /* ===== Invoice HTML (with UPI QR) ===== */
@@ -395,6 +511,148 @@
       return w;
     }
 
+    /* ===== Bill Editing Functions ===== */
+    function openEditBillModal(bill) {
+      currentlyEditingBill = bill;
+      editBillIdEl.textContent = bill.id;
+      
+      // Create form for editing
+      editBillContent.innerHTML = `
+        <div class="grid">
+          <label> Customer Name
+            <input type="text" id="editCustName" value="${bill.customer?.name || ''}" />
+          </label>
+          <label> Phone
+            <input type="text" id="editCustPhone" value="${bill.customer?.phone || ''}" />
+          </label>
+          <label> Bike Model&Name
+            <input type="text" id="editBikeModel" value="${bill.customer?.model || ''}" />
+          </label>
+          <label> Bike No
+            <input type="text" id="editVehicleNo" value="${bill.customer?.vehicle || ''}" />
+          </label>
+          <label> Service Notes
+            <input type="text" id="editServiceNotes" value="${bill.customer?.notes || ''}" />
+          </label>
+        </div>
+        
+        <h3 style="margin-top: 20px;">Bill Items</h3>
+        <table id="editItemsTable">
+          <thead>
+            <tr>
+              <th class="center">Sr</th>
+              <th>Particulars</th>
+              <th class="center">Qty</th>
+              <th class="right">Rate (₹)</th>
+              <th class="right">Amount (₹)</th>
+              <th class="center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bill.items.map((item, index) => `
+              <tr>
+                <td class="center">${index + 1}</td>
+                <td><input type="text" value="${item.particular}" data-field="particular" data-index="${index}" /></td>
+                <td class="center"><input type="number" min="1" value="${item.qty}" data-field="qty" data-index="${index}" /></td>
+                <td class="right"><input type="number" min="0" step="0.01" value="${item.rate}" data-field="rate" data-index="${index}" /></td>
+                <td class="right amt">${currency(item.qty * item.rate)}</td>
+                <td class="center"><button class="btn danger" data-action="delete" data-index="${index}">Delete</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top: 10px;">
+          <button class="btn add" id="addEditItemBtn">+ Add Item</button>
+          <div class="sum" style="display: inline-block; margin-left: 20px;">Total: ₹<span id="editGrandTotal">${bill.total}</span></div>
+        </div>
+      `;
+      
+      // Set up event listeners for the edit form
+      const editItemInputs = editBillContent.querySelectorAll('input');
+      editItemInputs.forEach(input => {
+        input.addEventListener('input', recalcEditBill);
+      });
+      
+      editBillContent.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.dataset.index);
+          currentlyEditingBill.items.splice(index, 1);
+          openEditBillModal(currentlyEditingBill); // Refresh the form
+        });
+      });
+      
+      document.getElementById('addEditItemBtn').addEventListener('click', function() {
+        currentlyEditingBill.items.push({ particular: "", qty: 1, rate: 0 });
+        openEditBillModal(currentlyEditingBill); // Refresh the form
+      });
+      
+      editBillModal.style.display = 'flex';
+    }
+    
+    function recalcEditBill() {
+      // Update the bill object with form values
+      currentlyEditingBill.customer = {
+        name: document.getElementById('editCustName').value,
+        phone: document.getElementById('editCustPhone').value,
+        model: document.getElementById('editBikeModel').value,
+        vehicle: document.getElementById('editVehicleNo').value,
+        notes: document.getElementById('editServiceNotes').value
+      };
+      
+      // Update items from inputs
+      const inputs = editBillContent.querySelectorAll('input[data-field]');
+      inputs.forEach(input => {
+        const index = parseInt(input.dataset.index);
+        const field = input.dataset.field;
+        const value = field === 'qty' || field === 'rate' ? parseFloat(input.value) || 0 : input.value;
+        
+        if (currentlyEditingBill.items[index]) {
+          currentlyEditingBill.items[index][field] = value;
+        }
+      });
+      
+      // Recalculate amounts and total
+      const rows = editBillContent.querySelectorAll('#editItemsTable tbody tr');
+      rows.forEach((row, index) => {
+        if (currentlyEditingBill.items[index]) {
+          const item = currentlyEditingBill.items[index];
+          const amount = item.qty * item.rate;
+          row.querySelector('.amt').textContent = currency(amount);
+        }
+      });
+      
+      // Update grand total
+      const total = currentlyEditingBill.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+      document.getElementById('editGrandTotal').textContent = currency(total);
+      currentlyEditingBill.total = currency(total);
+    }
+    
+    async function saveBillEdit() {
+      recalcEditBill(); // Ensure we have the latest data
+      
+      try {
+        // Try to update in Firebase first
+        const billDoc = billsCache.find(b => b.id === currentlyEditingBill.id);
+        if (billDoc && billDoc._id) {
+          await updateDoc(doc(db, "bills", billDoc._id), currentlyEditingBill);
+        }
+        
+        // Update local cache
+        const index = billsCache.findIndex(b => b.id === currentlyEditingBill.id);
+        if (index !== -1) {
+          billsCache[index] = currentlyEditingBill;
+          saveBillsToLocalStorage();
+          renderHistoryTable();
+        }
+        
+        showToast("Bill updated successfully");
+        closeEditModal.click();
+      } catch (error) {
+        console.error("Error updating bill:", error);
+        showToast("Error updating bill");
+      }
+    }
+
     /* ===== Events ===== */
     addItemBtn.addEventListener("click", ()=>{
       const idx = items.length;
@@ -405,26 +663,54 @@
 
     tbodyHistory.addEventListener("click", async (e)=>{
       const vBtn = e.target.closest(".btn-view");
+      const eBtn = e.target.closest(".btn-edit");
       const dBtn = e.target.closest(".btn-del-bill");
+      
       if(vBtn){
         const id = Number(vBtn.dataset.id);
         const bill = billsCache.find(x => Number(x.id) === id);
         if(bill) openInvoiceWindowAndRender(bill);
+      } else if(eBtn){
+        const id = Number(eBtn.dataset.id);
+        const bill = billsCache.find(x => Number(x.id) === id);
+        if(bill) openEditBillModal(JSON.parse(JSON.stringify(bill))); // Deep clone
       } else if(dBtn){
         const docId = dBtn.dataset.doc;
         if(confirm("Delete this bill?")){
-          await deleteDoc(doc(db, "bills", docId));
-          await loadHistory();
-          await setNextBillId();
+          try {
+            // Try to delete from Firebase
+            if (docId && !docId.includes('local')) {
+              await deleteDoc(doc(db, "bills", docId));
+            }
+            
+            // Delete from local cache
+            billsCache = billsCache.filter(b => b._id !== docId && b.localId !== docId);
+            saveBillsToLocalStorage();
+            renderHistoryTable();
+            showToast("Bill deleted");
+          } catch (error) {
+            console.error("Error deleting bill:", error);
+            showToast("Error deleting bill");
+          }
         }
       }
     });
 
+    // Modal events
+    closeEditModal.addEventListener('click', () => {
+      editBillModal.style.display = 'none';
+    });
+    
+    cancelEdit.addEventListener('click', () => {
+      editBillModal.style.display = 'none';
+    });
+    
+    saveEditedBill.addEventListener('click', saveBillEdit);
+
     // Instant invoice + background save
-    genBillBtn.addEventListener("click", ()=>{
+    genBillBtn.addEventListener("click", async ()=>{
       const custName = document.getElementById('custName').value.trim();
       const custPhone= document.getElementById('custPhone').value.trim();
-      const custAddr = document.getElementById('custAddr').value.trim();
       const bikeModel= document.getElementById('bikeModel').value.trim();
       const vehicleNo= document.getElementById('vehicleNo').value.trim();
       const notes    = document.getElementById('serviceNotes').value.trim();
@@ -439,7 +725,7 @@
         date: nowString(),
         total: currency(total),
         items: items.map(it => ({ particular:it.particular, qty:Number(it.qty)||0, rate:Number(it.rate)||0 })),
-        customer: { name:custName, phone:custPhone, address:custAddr, model:bikeModel, vehicle:vehicleNo, notes }
+        customer: { name:custName, phone:custPhone, model:bikeModel, vehicle:vehicleNo, notes }
       };
 
       // 1) Show invoice immediately
@@ -447,7 +733,6 @@
       // 2) Reset UI immediately for snappy feel
       document.getElementById('custName').value='';
       document.getElementById('custPhone').value='';
-      document.getElementById('custAddr').value='';
       document.getElementById('bikeModel').value='';
       document.getElementById('vehicleNo').value='';
       document.getElementById('serviceNotes').value='';
@@ -455,25 +740,43 @@
 
       // 3) Save in background (no waiting)
       showToast("Saving bill…");
-      addDoc(collection(db, "bills"), bill).then(async ()=>{
+      
+      try {
+        // Try to save to Firebase
+        const docRef = await addDoc(collection(db, "bills"), bill);
+        bill._id = docRef.id;
+        
+        // Also save to localStorage as backup
+        billsCache.unshift(bill);
+        saveBillsToLocalStorage();
+        renderHistoryTable();
+        
         nextBillId += 1;
-        await loadHistory();
         showToast("Saved ✓");
-      }).catch(err=>{
+      } catch(err) {
         console.error(err);
-        showToast("Save failed!");
+        // If Firebase fails, save to localStorage only
+        bill.localId = 'local-' + Date.now();
+        billsCache.unshift(bill);
+        saveBillsToLocalStorage();
+        renderHistoryTable();
+        nextBillId += 1;
+        showToast("Saved offline ✓");
+        
         if(win) {
-          try { win.alert("Bill save failed! Check internet/Firebase rules."); } catch(_){}
-        } else {
-          alert("Bill save failed! Check internet/Firebase rules.");
+          try { win.alert("Bill saved to local storage (offline mode)."); } catch(_){}
         }
-      });
+      }
     });
 
     /* ===== Boot ===== */
     (async function boot(){
+      // Load from localStorage first for immediate UI
+      loadBillsFromLocalStorage();
+      
       await setNextBillId();
       await loadHistory();
+      
       // Ensure at least one row present for quick entry
       if(items.length===0) addItemBtn.click();
     })();
