@@ -1,785 +1,1190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Beeru Bike Point — Cloud Billing</title>
-  <style>
-    :root{
-      --bg1:#0b1220; --bg2:#101a2f; --glass: rgba(255,255,255,0.06); --border: rgba(255,255,255,0.15);
-      --text:#e7eeff; --muted:#b3c0e6; --good:#2ee6a6; --danger:#ff4d6d;
-      --grad1:#5b8cff; --grad2:#8a5bff; --grad3:#00e0ff;
-    }
-    body{
-      margin:0; color:var(--text); font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial;
-      background: radial-gradient(1200px 800px at 10% -10%, rgba(91,140,255,.30), transparent 60%),
-                  radial-gradient(900px 600px at 90% 110%, rgba(0,224,255,.25), transparent 60%),
-                  linear-gradient(135deg, var(--bg1), var(--bg2));
-      min-height:100svh; overflow-x:hidden;
-    }
-    .bg-anim{ position:fixed; inset:-20vmax; background: conic-gradient(from 0deg, rgba(138,91,255,.15), rgba(0,224,255,.1), rgba(138,91,255,.15));
-      filter: blur(80px) saturate(160%); animation: spin 30s linear infinite; z-index:-1;}
-    @keyframes spin { to { transform: rotate(360deg);} }
-    .wrap{ max-width:1100px; margin:auto; padding:28px; }
-    header{
-      display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px;
-      padding:24px 20px; margin-bottom:22px; background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
-      border:1px solid var(--border); border-radius:22px; backdrop-filter: blur(10px); box-shadow: 0 0 24px rgba(0,224,255,.25);
-      text-align:center;
-    }
-    header img.logo{ width:76px; height:76px; border-radius:50%; object-fit:cover; box-shadow:0 0 24px rgba(0,224,255,.35);}
-    h1{
-      margin:0; font-weight:800; line-height:1; font-size: clamp(28px, 4.5vw, 48px);
-      background: linear-gradient(90deg, var(--grad1), var(--grad3), var(--grad2));
-      -webkit-background-clip:text; background-clip:text; color:transparent;
-      text-shadow: 0 0 10px rgba(91,140,255,.35);
-      -webkit-box-reflect: below -6px linear-gradient(transparent 0%, rgba(255,255,255,.07) 30%, transparent 60%);
-    }
-    .sub{ margin:0; color:var(--muted); font-size:14px; }
-    .badge{ padding:6px 10px; font-size:12px; letter-spacing:.4px; color:var(--muted); border:1px solid var(--border); border-radius:999px; background:var(--glass);}
-    .card{
-      background: var(--glass); border:1px solid var(--border); border-radius:20px; padding:18px;
-      backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,.25); margin-bottom:18px;
-    }
-    .card h2{ margin:0 0 12px; font-size:18px; color:#eaf2ff; letter-spacing:.2px; display:flex; align-items:center; gap:8px;}
-    .grid{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-    label{ display:flex; flex-direction:column; font-size:12px; color:var(--muted); gap:6px; }
-    input[type="text"], input[type="number"]{
-      background: rgba(255,255,255,.06); border:1px solid var(--border); color:var(--text);
-      border-radius:12px; padding:10px 12px; outline:none; transition: box-shadow .2s, border-color .2s, transform .1s;
-    }
-    input:focus{ border-color: rgba(91,140,255,.8); box-shadow: 0 0 0 3px rgba(91,140,255,.25), 0 0 20px rgba(0,224,255,.2); transform: translateY(-1px); }
-    .btn{ cursor:pointer; border:none; border-radius:12px; padding:10px 14px; font-weight:700;
-      letter-spacing:.2px; transition: transform .08s ease, box-shadow .2s ease; color:#001022;}
-    .btn:hover{ transform: translateY(-1px); }
-    .btn.add{ background: linear-gradient(90deg, rgba(138,91,255,.95), rgba(0,224,255,.9)); box-shadow:0 0 18px rgba(138,91,255,.4), 0 0 28px rgba(0,224,255,.25); }
-    .btn.success{ background: linear-gradient(90deg, rgba(46,230,166,.95), rgba(0,224,255,.9)); box-shadow: 0 0 18px rgba(46,230,166,.45); color:#001713; }
-    .btn.secondary{ background: linear-gradient(90deg, rgba(91,140,255,.95), rgba(0,224,255,.9)); box-shadow:0 0 18px rgba(91,140,255,.4); }
-    .btn.danger{ background: linear-gradient(90deg, rgba(255,77,109,.95), rgba(255,122,150,.9)); color:#2b0010; box-shadow:0 0 18px rgba(255,77,109,.35); }
-    .btn.edit{ background: linear-gradient(90deg, rgba(255, 184, 0, 0.95), rgba(255, 220, 0, 0.9)); color:#2b2300; box-shadow:0 0 18px rgba(255, 184, 0, 0.35); }
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
-    .sum{ margin-left:auto; font-weight:800; }
-    table{ width:100%; border-collapse: collapse; overflow:hidden; border-radius:16px; }
-    thead th{ font-size:12px; text-transform:uppercase; letter-spacing:.4px; background: linear-gradient(90deg, rgba(91,140,255,.22), rgba(0,224,255,.20)); color:#eaf2ff; border-bottom:1px solid var(--border); padding:10px; }
-    td{ padding:10px; border-bottom:1px solid rgba(255,255,255,.06); }
-    tbody tr{ background: rgba(255,255,255,.03); transition: background .2s, box-shadow .2s; }
-    tbody tr:hover{ background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 9999px rgba(91,140,255,.03); }
-    .right{ text-align:right; } .center{ text-align:center; }
-    footer{ text-align:center; color:var(--muted); padding:24px 10px; }
-
-    /* Toast */
-    .toast{
-      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,.65); color:#fff; padding:10px 14px; border-radius:999px;
-      font-size:13px; letter-spacing:.2px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      opacity:0; pointer-events:none; transition: opacity .25s, transform .25s;
-    }
-    .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
-
-    /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-content {
-      background: var(--bg2);
-      border-radius: 20px;
-      padding: 24px;
-      width: 90%;
-      max-width: 600px;
-      border: 1px solid var(--border);
-      box-shadow: 0 0 30px rgba(0,224,255,0.3);
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .modal-title {
-      margin: 0;
-      font-size: 22px;
-    }
-    .close-modal {
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 24px;
-      cursor: pointer;
-    }
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-
-    @media (max-width: 900px){ .grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (max-width: 640px){ .grid{ grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="bg-anim" aria-hidden="true"></div>
-
-  <div class="wrap">
-    <header>
-      <img class="logo" id="shopLogo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Motorcycle_icon.svg/512px-Motorcycle_icon.svg.png" alt="Shop Logo"/>
-      <span class="badge">Fast • Reliable • Affordable</span>
-      <h1>Beeru Bike Point</h1>
-      <p class="sub" id="shopAddress">Gautewadi, Digha Naka, Nr. Empire Tower, Thane Belapur Road, Navi Mumbai-400708 • +91 9867133048/9004191922</p>
-    </header>
-
-    <!-- Customer Details -->
-    <section class="card">
-      <h2>Customer Details</h2>
-      <div class="grid">
-        <label> Customer Name
-          <input type="text" id="custName" placeholder="e.g. Suraj"/>
-        </label>
-        <label> Phone
-          <input type="text" id="custPhone" placeholder="e.g. 98xxxxxx22"/>
-        </label>
-        <label> Bike Model&Name
-          <input type="text" id="bikeModel" placeholder="e.g. Splendor Plus"/>
-        </label>
-        <label> Bike No
-          <input type="text" id="vehicleNo" placeholder="e.g. MH-02-AB-1234"/>
-        </label>
-        <label> Service Notes
-          <input type="text" id="serviceNotes" placeholder="e.g. Engine oil, chain lube"/>
-        </label>
-      </div>
-    </section>
-
-    <!-- Items -->
-    <section class="card">
-      <h2>Create Bill</h2>
-      <table id="itemsTable">
-        <thead>
-          <tr>
-            <th class="center">Sr</th>
-            <th>Particulars</th>
-            <th class="center">Qty</th>
-            <th class="right">Rate (₹)</th>
-            <th class="right">Amount (₹)</th>
-            <th class="center">Action</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="actions">
-        <button class="btn add" id="addItemBtn">+ Add Item</button>
-        <div class="sum">Total: ₹<span id="grandTotal">0.00</span></div>
-        <button class="btn success" id="genBillBtn">Generate Bill</button>
-      </div>
-    </section>
-
-    <!-- History -->
-    <section class="card">
-      <h2>Bill History</h2>
-      <table id="historyTable">
-        <thead>
-          <tr>
-            <th>Bill No</th>
-            <th>Date</th>
-            <th>Customer</th>
-            <th class="right">Total (₹)</th>
-            <th class="center">Action</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
-    <footer>© 2025 Beeru Bike Point • Cloud Billing</footer>
-  </div>
-
-  <!-- Edit Bill Modal -->
-  <div class="modal" id="editBillModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">Edit Bill #<span id="editBillId"></span></h3>
-        <button class="close-modal" id="closeEditModal">&times;</button>
-      </div>
-      <div id="editBillContent">
-        <!-- Content will be dynamically inserted here -->
-      </div>
-      <div class="modal-actions">
-        <button class="btn danger" id="cancelEdit">Cancel</button>
-        <button class="btn success" id="saveEditedBill">Save Changes</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <!-- Firebase + App -->
-  <script type="module">
-    /* ======= SHOP & UPI ======= */
-    const SHOP = {
-      name: "Beeru Bike Point",
-      address: "Gautewadi, Diga Naka, Nr. Empire Tower, Thane Belapur Road, Navi Mumbai-400708",
-      phone: "+91 9867133048/9004191922",
-      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Motorcycle_icon.svg/512px-Motorcycle_icon.svg.png",
-      upiId: "7208386748-2@ybl",
-      upiName: "Beeru Bike Point"
-    };
-    document.getElementById("shopLogo").src = SHOP.logoUrl;
-    document.getElementById("shopAddress").textContent = SHOP.address + " • " + SHOP.phone;
-
-    /* ===== Firebase SDKs ===== */
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, orderBy, query, limit, updateDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
-    /* ===== Your Firebase Config (as provided) ===== */
-    const firebaseConfig = {
-      apiKey: "AIzaSyCyQP4zz2k00Wr1jLq4ZTcTJNHxsqH5eEE",
-      authDomain: "beeru-bike-bill.firebaseapp.com",
-      projectId: "beeru-bike-bill",
-      storageBucket: "beeru-bike-bill.firebasestorage.app",
-      messagingSenderId: "283569928366",
-      appId: "1:283569928366:web:5f027b08774453bcef553f",
-      measurementId: "G-YFG1858SPS"
-    };
-
-    /* ===== Init ===== */
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
-
-    /* ===== State ===== */
-    let items = [];
-    let billsCache = [];
-    let nextBillId = 1;
-    let currentlyEditingBill = null;
-
-    /* ===== Elements ===== */
-    const tbodyItems   = document.querySelector("#itemsTable tbody");
-    const tbodyHistory = document.querySelector("#historyTable tbody");
-    const addItemBtn   = document.getElementById("addItemBtn");
-    const genBillBtn   = document.getElementById("genBillBtn");
-    const grandTotalEl = document.getElementById("grandTotal");
-    const toastEl      = document.getElementById("toast");
-    const editBillModal = document.getElementById("editBillModal");
-    const editBillContent = document.getElementById("editBillContent");
-    const editBillIdEl = document.getElementById("editBillId");
-    const closeEditModal = document.getElementById("closeEditModal");
-    const cancelEdit = document.getElementById("cancelEdit");
-    const saveEditedBill = document.getElementById("saveEditedBill");
-
-    /* ===== Local Storage Functions ===== */
-    function saveBillsToLocalStorage() {
-      localStorage.setItem('beeruBikeBills', JSON.stringify(billsCache));
-    }
-
-    function loadBillsFromLocalStorage() {
-      const savedBills = localStorage.getItem('beeruBikeBills');
-      if (savedBills) {
-        try {
-          billsCache = JSON.parse(savedBills);
-          renderHistoryTable();
-        } catch (e) {
-          console.error('Error loading bills from localStorage:', e);
-        }
-      }
-    }
-
-    /* ===== Utilities ===== */
-    const currency = (n)=> Number(n||0).toFixed(2);
-    const nowString = ()=> new Date().toLocaleString();
-    const showToast = (msg)=>{
-      toastEl.textContent = msg;
-      toastEl.classList.add("show");
-      setTimeout(()=> toastEl.classList.remove("show"), 1600);
-    };
-
-    function calcGrandTotal(){
-      const t = items.reduce((s,it)=> s + (Number(it.qty||0)*Number(it.rate||0)), 0);
-      grandTotalEl.textContent = currency(t);
-      return t;
-    }
-    function rerenderSr(){
-      [...tbodyItems.querySelectorAll("tr")].forEach((tr,i)=> tr.querySelector("td").textContent = i+1);
-    }
-    function makeInputRow(index, particular = "", qty = 1, rate = 0){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="center">${index+1}</td>
-        <td><input type="text" placeholder="Particular" value="${particular}" /></td>
-        <td class="center"><input type="number" min="1" value="${qty}"/></td>
-        <td class="right"><input type="number" min="0" step="0.01" value="${rate}"/></td>
-        <td class="right amt">${currency(qty * rate)}</td>
-        <td class="center"><button class="btn danger btn-del">Delete</button></td>
-      `;
-      // setup state + bindings
-      items[index] = { particular, qty, rate };
-      const [partI, qtyI, rateI] = tr.querySelectorAll("input");
-      const amtTd = tr.querySelector(".amt");
-
-      const recalc = ()=>{
-        const q = items[index].qty = parseFloat(qtyI.value)||0;
-        const r = items[index].rate = parseFloat(rateI.value)||0;
-        const a = q*r;
-        amtTd.textContent = currency(a);
-        calcGrandTotal();
-      };
-
-      partI.addEventListener("input", ()=>{ items[index].particular = partI.value; });
-      qtyI.addEventListener("input", recalc);
-      rateI.addEventListener("input", recalc);
-
-      tr.querySelector(".btn-del").addEventListener("click", ()=>{
-        tr.remove();
-        items.splice(index,1);
-        rerenderSr();
-        calcGrandTotal();
-      });
-
-      return tr;
-    }
-    function clearItemTable(){
-      items = [];
-      tbodyItems.innerHTML = "";
-      calcGrandTotal();
-    }
-
-    /* ===== Firestore helpers ===== */
-    async function setNextBillId(){
-      const q = query(collection(db, "bills"), orderBy("id","desc"), limit(1));
-      const snap = await getDocs(q);
-      if(!snap.empty){ 
-        nextBillId = (Number(snap.docs[0].data().id)||0)+1; 
-      } else {
-        // Check localStorage for bills if Firebase is empty
-        const localBills = JSON.parse(localStorage.getItem('beeruBikeBills') || '[]');
-        if (localBills.length > 0) {
-          const maxId = Math.max(...localBills.map(bill => Number(bill.id) || 0));
-          nextBillId = maxId + 1;
-        } else {
-          nextBillId = 1;
-        }
-      }
-    }
-    
-    function renderHistoryTable() {
-      tbodyHistory.innerHTML = "";
-      for(const b of billsCache){
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${b.id}</td>
-          <td>${b.date}</td>
-          <td>${b.customer?.name || "-"}</td>
-          <td class="right">₹${b.total}</td>
-          <td class="center">
-            <button class="btn secondary btn-view" data-id="${b.id}">View</button>
-            <button class="btn edit btn-edit" data-id="${b.id}">Edit</button>
-            <button class="btn danger btn-del-bill" data-doc="${b._id || b.localId}">Delete</button>
-          </td>
-        `;
-        tbodyHistory.appendChild(tr);
-      }
-    }
-    
-    async function loadHistory(){
-      billsCache = [];
-      
-      // Try to load from Firebase first
-      try {
-        const q = query(collection(db, "bills"), orderBy("id","desc")); // latest first
-        const snap = await getDocs(q);
-        snap.forEach(d => billsCache.push({ _id:d.id, ...d.data() }));
-        
-        // Save to localStorage as backup
-        saveBillsToLocalStorage();
-      } catch (error) {
-        console.error("Error loading from Firebase, using localStorage:", error);
-        // If Firebase fails, load from localStorage
-        loadBillsFromLocalStorage();
-      }
-      
-      renderHistoryTable();
-    }
-
-    /* ===== Invoice HTML (with UPI QR) ===== */
-    function makeUpiQrUrl(amount, billId){
-      const upiLink = `upi://pay?pa=${encodeURIComponent(SHOP.upiId)}&pn=${encodeURIComponent(SHOP.upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent("Invoice #"+billId)}`;
-      // Using free QR server (no auth)
-      return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}`;
-    }
-
-    function billToHTML(bill){
-      const itemsHTML = bill.items.map((it,i)=>`
-        <tr>
-          <td style="padding:8px;">${i+1}</td>
-          <td style="padding:8px;">${it.particular}</td>
-          <td style="padding:8px; text-align:right;">${it.qty}</td>
-          <td style="padding:8px; text-align:right;">${currency(it.rate)}</td>
-          <td style="padding:8px; text-align:right;">${currency(it.qty*it.rate)}</td>
-        </tr>
-      `).join('');
-      const cust = bill.customer || {};
-      const qrUrl = makeUpiQrUrl(bill.total, bill.id);
-      return `
-        <div style="display:flex; gap:12px; align-items:center; margin-bottom:6px;">
-          <img src="${SHOP.logoUrl}" alt="logo" style="width:54px; height:54px; border-radius:12px; object-fit:cover;"/>
-          <div>
-            <div style="font-weight:800; font-size:22px;">${SHOP.name}</div>
-            <div style="font-size:12px; color:#666">${SHOP.address} • ${SHOP.phone}</div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin:10px 0 14px; font-size:14px;">
-          <div style="flex:2 1 320px; display:flex; gap:12px; flex-wrap:wrap;">
-            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-              <strong>Customer:</strong> ${cust.name||"-"}<br/><span style="color:#666">Phone:</span> ${cust.phone||'-'}
-            </div>
-            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-              <strong>Vehicle:</strong> ${cust.vehicle||'-'}<br/><span style="color:#666">Model:</span> ${cust.model||'-'}
-            </div>
-            <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px;">
-              <strong>Bill No:</strong> ${bill.id}<br/><span style="color:#666">Date:</span> ${bill.date}
-            </div>
-            <div style="flex:1 1 100%; border:1px solid #eee; border-radius:10px; padding:8px;">
-              <strong>Address:</strong> ${cust.address||'-'} | <strong>Notes:</strong> ${cust.notes||'-'}
-            </div>
-          </div>
-
-          <div style="flex:1 1 220px; border:1px solid #eee; border-radius:10px; padding:8px; text-align:center;">
-            <div style="font-weight:700; margin-bottom:6px;">Pay via UPI</div>
-            <img src="${qrUrl}" alt="UPI QR" style="width:200px; height:200px;"/>
-            <div style="font-size:12px; margin-top:6px;">
-              <div><strong>UPI:</strong> ${SHOP.upiId}</div>
-              <div><strong>Amount:</strong> ₹${bill.total}</div>
-            </div>
-          </div>
-        </div>
-
-        <table style="width:100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background:#f0f3f8;">
-              <th style="padding:8px; text-align:left; border:1px solid #e5e7eb;">Sr</th>
-              <th style="padding:8px; text-align:left; border:1px solid #e5e7eb;">Particulars</th>
-              <th style="padding:8px; text-align:right; border:1px solid #e5e7eb;">Qty</th>
-              <th style="padding:8px; text-align:right; border:1px solid #e5e7eb;">Rate (₹)</th>
-              <th style="padding:8px; text-align:right; border:1px solid #e5e7eb;">Amount (₹)</th>
-            </tr>
-          </thead>
-          <tbody>${itemsHTML}</tbody>
-          <tfoot>
-            <tr>
-              <td colspan="4" style="padding:10px; text-align:right; font-weight:800; border:1px solid #e5e7eb;">Total</td>
-              <td style="padding:10px; text-align:right; font-weight:800; border:1px solid #e5e7eb;">₹${bill.total}</td>
-            </tr>
-          </tfoot>
-        </table>
-        <p style="margin-top:10px; font-size:12px; color:#666;">* Computer generated invoice.</p>
-      `;
-    }
-
-    function openInvoiceWindowAndRender(bill){
-      const w = window.open('', '', 'width=900,height=700');
-      if(!w){ alert("Popup blocked! Please allow popups for this site."); return null; }
-      const html = `
-        <html>
-          <head>
-            <title>Invoice #${bill.id} — ${SHOP.name}</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-            <style>
-              body{ font-family:Arial, sans-serif; padding:16px; }
-              @media print{ button{ display:none } }
-              table{ width:100%; border-collapse:collapse; }
-              th,td{ border:1px solid #ddd; }
-            </style>
-          </head>
-          <body>
-            ${billToHTML(bill)}
-            <div style="margin-top:12px;">
-              <button onclick="window.print()">🖨 Print</button>
-            </div>
-          </body>
-        </html>`;
-      w.document.open(); w.document.write(html); w.document.close(); w.focus();
-      return w;
-    }
-
-    /* ===== Bill Editing Functions ===== */
-    function openEditBillModal(bill) {
-      currentlyEditingBill = bill;
-      editBillIdEl.textContent = bill.id;
-      
-      // Create form for editing
-      editBillContent.innerHTML = `
-        <div class="grid">
-          <label> Customer Name
-            <input type="text" id="editCustName" value="${bill.customer?.name || ''}" />
-          </label>
-          <label> Phone
-            <input type="text" id="editCustPhone" value="${bill.customer?.phone || ''}" />
-          </label>
-          <label> Bike Model&Name
-            <input type="text" id="editBikeModel" value="${bill.customer?.model || ''}" />
-          </label>
-          <label> Bike No
-            <input type="text" id="editVehicleNo" value="${bill.customer?.vehicle || ''}" />
-          </label>
-          <label> Service Notes
-            <input type="text" id="editServiceNotes" value="${bill.customer?.notes || ''}" />
-          </label>
-        </div>
-        
-        <h3 style="margin-top: 20px;">Bill Items</h3>
-        <table id="editItemsTable">
-          <thead>
-            <tr>
-              <th class="center">Sr</th>
-              <th>Particulars</th>
-              <th class="center">Qty</th>
-              <th class="right">Rate (₹)</th>
-              <th class="right">Amount (₹)</th>
-              <th class="center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bill.items.map((item, index) => `
-              <tr>
-                <td class="center">${index + 1}</td>
-                <td><input type="text" value="${item.particular}" data-field="particular" data-index="${index}" /></td>
-                <td class="center"><input type="number" min="1" value="${item.qty}" data-field="qty" data-index="${index}" /></td>
-                <td class="right"><input type="number" min="0" step="0.01" value="${item.rate}" data-field="rate" data-index="${index}" /></td>
-                <td class="right amt">${currency(item.qty * item.rate)}</td>
-                <td class="center"><button class="btn danger" data-action="delete" data-index="${index}">Delete</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        <div style="margin-top: 10px;">
-          <button class="btn add" id="addEditItemBtn">+ Add Item</button>
-          <div class="sum" style="display: inline-block; margin-left: 20px;">Total: ₹<span id="editGrandTotal">${bill.total}</span></div>
-        </div>
-      `;
-      
-      // Set up event listeners for the edit form
-      const editItemInputs = editBillContent.querySelectorAll('input');
-      editItemInputs.forEach(input => {
-        input.addEventListener('input', recalcEditBill);
-      });
-      
-      editBillContent.querySelectorAll('[data-action="delete"]').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const index = parseInt(this.dataset.index);
-          currentlyEditingBill.items.splice(index, 1);
-          openEditBillModal(currentlyEditingBill); // Refresh the form
-        });
-      });
-      
-      document.getElementById('addEditItemBtn').addEventListener('click', function() {
-        currentlyEditingBill.items.push({ particular: "", qty: 1, rate: 0 });
-        openEditBillModal(currentlyEditingBill); // Refresh the form
-      });
-      
-      editBillModal.style.display = 'flex';
-    }
-    
-    function recalcEditBill() {
-      // Update the bill object with form values
-      currentlyEditingBill.customer = {
-        name: document.getElementById('editCustName').value,
-        phone: document.getElementById('editCustPhone').value,
-        model: document.getElementById('editBikeModel').value,
-        vehicle: document.getElementById('editVehicleNo').value,
-        notes: document.getElementById('editServiceNotes').value
-      };
-      
-      // Update items from inputs
-      const inputs = editBillContent.querySelectorAll('input[data-field]');
-      inputs.forEach(input => {
-        const index = parseInt(input.dataset.index);
-        const field = input.dataset.field;
-        const value = field === 'qty' || field === 'rate' ? parseFloat(input.value) || 0 : input.value;
-        
-        if (currentlyEditingBill.items[index]) {
-          currentlyEditingBill.items[index][field] = value;
-        }
-      });
-      
-      // Recalculate amounts and total
-      const rows = editBillContent.querySelectorAll('#editItemsTable tbody tr');
-      rows.forEach((row, index) => {
-        if (currentlyEditingBill.items[index]) {
-          const item = currentlyEditingBill.items[index];
-          const amount = item.qty * item.rate;
-          row.querySelector('.amt').textContent = currency(amount);
-        }
-      });
-      
-      // Update grand total
-      const total = currentlyEditingBill.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
-      document.getElementById('editGrandTotal').textContent = currency(total);
-      currentlyEditingBill.total = currency(total);
-    }
-    
-    async function saveBillEdit() {
-      recalcEditBill(); // Ensure we have the latest data
-      
-      try {
-        // Try to update in Firebase first
-        const billDoc = billsCache.find(b => b.id === currentlyEditingBill.id);
-        if (billDoc && billDoc._id) {
-          await updateDoc(doc(db, "bills", billDoc._id), currentlyEditingBill);
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beeru Bike Point - Billing System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #f59e0b;
+            --light: #f3f4f6;
+            --dark: #1f2937;
+            --success: #10b981;
+            --danger: #ef4444;
+            --gray: #6b7280;
+            --light-gray: #e5e7eb;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            --hover-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
         }
         
-        // Update local cache
-        const index = billsCache.findIndex(b => b.id === currentlyEditingBill.id);
-        if (index !== -1) {
-          billsCache[index] = currentlyEditingBill;
-          saveBillsToLocalStorage();
-          renderHistoryTable();
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
-        showToast("Bill updated successfully");
-        closeEditModal.click();
-      } catch (error) {
-        console.error("Error updating bill:", error);
-        showToast("Error updating bill");
-      }
-    }
-
-    /* ===== Events ===== */
-    addItemBtn.addEventListener("click", ()=>{
-      const idx = items.length;
-      const row = makeInputRow(idx);
-      tbodyItems.appendChild(row);
-      row.querySelector('input[type="text"]').focus();
-    });
-
-    tbodyHistory.addEventListener("click", async (e)=>{
-      const vBtn = e.target.closest(".btn-view");
-      const eBtn = e.target.closest(".btn-edit");
-      const dBtn = e.target.closest(".btn-del-bill");
-      
-      if(vBtn){
-        const id = Number(vBtn.dataset.id);
-        const bill = billsCache.find(x => Number(x.id) === id);
-        if(bill) openInvoiceWindowAndRender(bill);
-      } else if(eBtn){
-        const id = Number(eBtn.dataset.id);
-        const bill = billsCache.find(x => Number(x.id) === id);
-        if(bill) openEditBillModal(JSON.parse(JSON.stringify(bill))); // Deep clone
-      } else if(dBtn){
-        const docId = dBtn.dataset.doc;
-        if(confirm("Delete this bill?")){
-          try {
-            // Try to delete from Firebase
-            if (docId && !docId.includes('local')) {
-              await deleteDoc(doc(db, "bills", docId));
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e6f0ff 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        header::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, transparent 10%, rgba(255,255,255,0.1) 11%, rgba(255,255,255,0.1) 13%, transparent 14%);
+            background-size: 50px 50px;
+            transform: rotate(30deg);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .logo i {
+            font-size: 36px;
+            margin-right: 15px;
+            background: var(--secondary);
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+        
+        .header-subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 35px;
+            padding: 25px;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid var(--light-gray);
+        }
+        
+        .section:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        
+        h2 {
+            color: var(--primary);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light-gray);
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 22px;
+        }
+        
+        h2 i {
+            margin-right: 12px;
+            background: var(--primary);
+            color: white;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .input-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: var(--dark);
+            font-size: 15px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid var(--light-gray);
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: var(--light);
+        }
+        
+        input:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            background: white;
+        }
+        
+        .bill-actions {
+            display: flex;
+            gap: 18px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        button i {
+            margin-right: 10px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #0da271;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #e59409;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 25px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 500;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover {
+            background-color: #f8fafc;
+        }
+        
+        .action-cell {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        
+        .bill-preview {
+            display: none;
+            margin-top: 40px;
+            padding: 35px;
+            border: 1px solid var(--light-gray);
+            border-radius: 12px;
+            background: white;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .bill-header {
+            text-align: center;
+            margin-bottom: 35px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--light-gray);
+        }
+        
+        .bill-header h2 {
+            border-bottom: none;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .bill-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 35px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .bill-to, .bill-meta {
+            flex: 1;
+            min-width: 250px;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .bill-to h3, .bill-meta h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .bill-to h3 i, .bill-meta h3 i {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .bill-items {
+            margin-bottom: 35px;
+        }
+        
+        .bill-summary {
+            text-align: right;
+            margin-top: 35px;
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+            font-size: 17px;
+        }
+        
+        .summary-label {
+            width: 150px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .summary-value {
+            width: 120px;
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        .total-row {
+            border-top: 2px solid var(--light-gray);
+            padding-top: 12px;
+            margin-top: 12px;
+            font-size: 20px;
+            color: var(--primary);
+        }
+        
+        .bill-actions-preview {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 35px;
+            flex-wrap: wrap;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 25px;
+            background: var(--light);
+            color: var(--gray);
+            font-size: 15px;
+            margin-top: 40px;
+            border-top: 1px solid var(--light-gray);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease-out;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification i {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background: var(--success);
+        }
+        
+        .notification.error {
+            background: var(--danger);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        .modal-title {
+            font-size: 22px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 12px;
             }
             
-            // Delete from local cache
-            billsCache = billsCache.filter(b => b._id !== docId && b.localId !== docId);
-            saveBillsToLocalStorage();
-            renderHistoryTable();
-            showToast("Bill deleted");
-          } catch (error) {
-            console.error("Error deleting bill:", error);
-            showToast("Error deleting bill");
-          }
+            .content {
+                padding: 20px;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+            
+            .form-group {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .input-group {
+                width: 100%;
+            }
+            
+            .bill-details {
+                flex-direction: column;
+            }
+            
+            .action-cell {
+                flex-direction: column;
+            }
+            
+            .bill-actions, .bill-actions-preview {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+            
+            .bill-to, .bill-meta {
+                min-width: 100%;
+            }
         }
-      }
-    });
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-motorcycle"></i>
+                <h1>Beeru Bike Point</h1>
+            </div>
+            <p class="header-subtitle">Complete Bike Service Solutions</p>
+        </header>
 
-    // Modal events
-    closeEditModal.addEventListener('click', () => {
-      editBillModal.style.display = 'none';
-    });
-    
-    cancelEdit.addEventListener('click', () => {
-      editBillModal.style.display = 'none';
-    });
-    
-    saveEditedBill.addEventListener('click', saveBillEdit);
+        <div class="content">
+            <div class="section">
+                <h2><i class="fas fa-user"></i> Customer Details</h2>
+                <div class="form-group">
+                    <div class="input-group">
+                        <label for="customerName">Name</label>
+                        <input type="text" id="customerName" placeholder="e.g. Sunil">
+                    </div>
+                    <div class="input-group">
+                        <label for="customerPhone">Phone</label>
+                        <input type="text" id="customerPhone" placeholder="e.g. 98xxxxxx22">
+                    </div>
+                    <div class="input-group">
+                        <label for="vehicleNo">Vehicle No</label>
+                        <input type="text" id="vehicleNo" placeholder="e.g. MH-02-AB-1234">
+                    </div>
+                </div>
+            </div>
 
-    // Instant invoice + background save
-    genBillBtn.addEventListener("click", async ()=>{
-      const custName = document.getElementById('custName').value.trim();
-      const custPhone= document.getElementById('custPhone').value.trim();
-      const bikeModel= document.getElementById('bikeModel').value.trim();
-      const vehicleNo= document.getElementById('vehicleNo').value.trim();
-      const notes    = document.getElementById('serviceNotes').value.trim();
+            <div class="section">
+                <h2><i class="fas fa-receipt"></i> Create Bill</h2>
+                <table id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th>Sr No</th>
+                            <th>Particulars</th>
+                            <th>Qty</th>
+                            <th>Rate (₹)</th>
+                            <th>Amount (₹)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td><input type="text" class="particulars" placeholder="Service/item name"></td>
+                            <td><input type="number" class="qty" placeholder="Qty" min="1" value="1"></td>
+                            <td><input type="number" class="rate" placeholder="Rate" min="0" value="0"></td>
+                            <td class="amount">0.00</td>
+                            <td class="action-cell">
+                                <button class="btn-danger action-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i> Remove</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="bill-actions">
+                    <button class="btn-secondary" onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
+                    <button class="btn-success" onclick="generateBill()"><i class="fas fa-file-invoice"></i> Generate Bill</button>
+                </div>
+            </div>
 
-      if(!custName || !vehicleNo){ alert("Enter customer name and bike number"); return; }
-      if(items.length===0){ alert("Add at least one item"); return; }
+            <div id="billPreview" class="bill-preview">
+                <div class="bill-header">
+                    <h2><i class="fas fa-receipt"></i> Invoice</h2>
+                    <p>Beeru Bike Point - Professional Bike Services</p>
+                </div>
+                
+                <div class="bill-details">
+                    <div class="bill-to">
+                        <h3><i class="fas fa-user"></i> Customer Information</h3>
+                        <p><strong>Name:</strong> <span id="billCustomerName"></span></p>
+                        <p><strong>Phone:</strong> <span id="billCustomerPhone"></span></p>
+                        <p><strong>Vehicle No:</strong> <span id="billVehicleNo"></span></p>
+                    </div>
+                    
+                    <div class="bill-meta">
+                        <h3><i class="fas fa-file-invoice"></i> Invoice Details</h3>
+                        <p><strong>Invoice #:</strong> <span id="billNumber"></span></p>
+                        <p><strong>Date:</strong> <span id="billDate"></span></p>
+                        <p><strong>Time:</strong> <span id="billTime"></span></p>
+                    </div>
+                </div>
+                
+                <div class="bill-items">
+                    <table id="billItemsTable">
+                        <thead>
+                            <tr>
+                                <th>Sr No</th>
+                                <th>Particulars</th>
+                                <th>Qty</th>
+                                <th>Rate (₹)</th>
+                                <th>Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Bill items will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="bill-summary">
+                    <div class="summary-row">
+                        <div class="summary-label">Subtotal:</div>
+                        <div class="summary-value" id="billSubtotal">0.00</div>
+                    </div>
+                    <div class="summary-row">
+                        <div class="summary-label">GST (18%):</div>
+                        <div class="summary-value" id="billGst">0.00</div>
+                    </div>
+                    <div class="summary-row total-row">
+                        <div class="summary-label">Total:</div>
+                        <div class="summary-value" id="billTotal">0.00</div>
+                    </div>
+                </div>
+                
+                <div class="bill-actions-preview">
+                    <button class="btn-primary" onclick="downloadPDF()"><i class="fas fa-download"></i> Download PDF</button>
+                    <button class="btn-success" onclick="shareBill()"><i class="fas fa-share-alt"></i> Share Bill</button>
+                    <button class="btn-danger" onclick="closeBillPreview()"><i class="fas fa-times"></i> Close</button>
+                </div>
+            </div>
 
-      const total = calcGrandTotal();
+            <div class="section">
+                <h2><i class="fas fa-history"></i> Bill History</h2>
+                <table id="billHistory">
+                    <thead>
+                        <tr>
+                            <th>Bill No</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Total (₹)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Bill history will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-      const bill = {
-        id: nextBillId, // reserve this id
-        date: nowString(),
-        total: currency(total),
-        items: items.map(it => ({ particular:it.particular, qty:Number(it.qty)||0, rate:Number(it.rate)||0 })),
-        customer: { name:custName, phone:custPhone, model:bikeModel, vehicle:vehicleNo, notes }
-      };
+        <footer>
+            <p>© 2025 Beeru Bike Point. All rights reserved.</p>
+        </footer>
+    </div>
 
-      // 1) Show invoice immediately
-      const win = openInvoiceWindowAndRender(bill);
-      // 2) Reset UI immediately for snappy feel
-      document.getElementById('custName').value='';
-      document.getElementById('custPhone').value='';
-      document.getElementById('bikeModel').value='';
-      document.getElementById('vehicleNo').value='';
-      document.getElementById('serviceNotes').value='';
-      clearItemTable();
+    <!-- Edit Bill Modal -->
+    <div id="editBillModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-edit"></i> Edit Bill</h3>
+                <button class="close-modal" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div id="editBillContent">
+                <!-- Edit form will be inserted here -->
+            </div>
+        </div>
+    </div>
 
-      // 3) Save in background (no waiting)
-      showToast("Saving bill…");
-      
-      try {
-        // Try to save to Firebase
-        const docRef = await addDoc(collection(db, "bills"), bill);
-        bill._id = docRef.id;
+    <div id="notification" class="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notification-text">Operation completed successfully</span>
+    </div>
+
+    <script>
+        // Initialize variables
+        let billCounter = 1;
+        let billHistory = [];
         
-        // Also save to localStorage as backup
-        billsCache.unshift(bill);
-        saveBillsToLocalStorage();
-        renderHistoryTable();
-        
-        nextBillId += 1;
-        showToast("Saved ✓");
-      } catch(err) {
-        console.error(err);
-        // If Firebase fails, save to localStorage only
-        bill.localId = 'local-' + Date.now();
-        billsCache.unshift(bill);
-        saveBillsToLocalStorage();
-        renderHistoryTable();
-        nextBillId += 1;
-        showToast("Saved offline ✓");
-        
-        if(win) {
-          try { win.alert("Bill saved to local storage (offline mode)."); } catch(_){}
+        // Load data from localStorage
+        function loadFromLocalStorage() {
+            const savedBillHistory = localStorage.getItem('beeruBikeBillHistory');
+            const savedBillCounter = localStorage.getItem('beeruBikeBillCounter');
+            
+            if (savedBillHistory) {
+                billHistory = JSON.parse(savedBillHistory);
+                updateBillHistory();
+            }
+            
+            if (savedBillCounter) {
+                billCounter = parseInt(savedBillCounter);
+            }
+            
+            // If no history exists, add sample data
+            if (billHistory.length === 0) {
+                addSampleData();
+            }
         }
-      }
-    });
-
-    /* ===== Boot ===== */
-    (async function boot(){
-      // Load from localStorage first for immediate UI
-      loadBillsFromLocalStorage();
-      
-      await setNextBillId();
-      await loadHistory();
-      
-      // Ensure at least one row present for quick entry
-      if(items.length===0) addItemBtn.click();
-    })();
-  </script>
+        
+        // Save data to localStorage
+        function saveToLocalStorage() {
+            localStorage.setItem('beeruBikeBillHistory', JSON.stringify(billHistory));
+            localStorage.setItem('beeruBikeBillCounter', billCounter.toString());
+        }
+        
+        // Add sample data for demonstration
+        function addSampleData() {
+            billHistory = [
+                { 
+                    id: 1,
+                    billNumber: 'BBP20230001', 
+                    date: '01/09/2023', 
+                    customerName: 'Rahul Sharma',
+                    customerPhone: '9876543210',
+                    vehicleNo: 'MH-01-AB-1234',
+                    total: '1250.00',
+                    items: [
+                        { particulars: 'Engine Oil Change', qty: '1', rate: '500.00', amount: '500.00' },
+                        { particulars: 'Air Filter', qty: '1', rate: '250.00', amount: '250.00' },
+                        { particulars: 'Labor Charges', qty: '1', rate: '500.00', amount: '500.00' }
+                    ]
+                },
+                { 
+                    id: 2,
+                    billNumber: 'BBP20230002', 
+                    date: '03/09/2023', 
+                    customerName: 'Priya Patel',
+                    customerPhone: '9876543211',
+                    vehicleNo: 'MH-02-CD-5678',
+                    total: '850.00',
+                    items: [
+                        { particulars: 'Break Adjustment', qty: '1', rate: '300.00', amount: '300.00' },
+                        { particulars: 'Chain Lubrication', qty: '1', rate: '150.00', amount: '150.00' },
+                        { particulars: 'Labor Charges', qty: '1', rate: '400.00', amount: '400.00' }
+                    ]
+                },
+                { 
+                    id: 3,
+                    billNumber: 'BBP20230003', 
+                    date: '05/09/2023', 
+                    customerName: 'Vikram Singh',
+                    customerPhone: '9876543212',
+                    vehicleNo: 'MH-03-EF-9012',
+                    total: '2100.00',
+                    items: [
+                        { particulars: 'Full Service', qty: '1', rate: '1500.00', amount: '1500.00' },
+                        { particulars: 'Spark Plug', qty: '1', rate: '300.00', amount: '300.00' },
+                        { particulars: 'Labor Charges', qty: '1', rate: '300.00', amount: '300.00' }
+                    ]
+                }
+            ];
+            
+            billCounter = 4;
+            updateBillHistory();
+            saveToLocalStorage();
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notification-text');
+            
+            notificationText.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Calculate amount when qty or rate changes
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('qty') || e.target.classList.contains('rate')) {
+                const row = e.target.closest('tr');
+                const qty = parseFloat(row.querySelector('.qty').value) || 0;
+                const rate = parseFloat(row.querySelector('.rate').value) || 0;
+                const amountCell = row.querySelector('.amount');
+                
+                amountCell.textContent = (qty * rate).toFixed(2);
+            }
+        });
+        
+        // Add new item row
+        function addItem() {
+            const table = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+            const rowCount = table.rows.length;
+            const row = table.insertRow();
+            
+            row.innerHTML = `
+                <td>${rowCount + 1}</td>
+                <td><input type="text" class="particulars" placeholder="Service/item name"></td>
+                <td><input type="number" class="qty" placeholder="Qty" min="1" value="1"></td>
+                <td><input type="number" class="rate" placeholder="Rate" min="0" value="0"></td>
+                <td class="amount">0.00</td>
+                <td class="action-cell">
+                    <button class="btn-danger action-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i> Remove</button>
+                </td>
+            `;
+            
+            showNotification('New item added to the bill');
+        }
+        
+        // Remove item row
+        function removeItem(button) {
+            const row = button.closest('tr');
+            if (document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows.length > 1) {
+                row.remove();
+                // Update serial numbers
+                const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].cells[0].textContent = i + 1;
+                }
+                showNotification('Item removed from the bill');
+            } else {
+                showNotification('You need to have at least one item in the bill.', 'error');
+            }
+        }
+        
+        // Generate bill preview
+        function generateBill() {
+            const customerName = document.getElementById('customerName').value || 'Not provided';
+            const customerPhone = document.getElementById('customerPhone').value || 'Not provided';
+            const vehicleNo = document.getElementById('vehicleNo').value || 'Not provided';
+            
+            if (customerName === 'Not provided') {
+                showNotification('Please enter customer name', 'error');
+                return;
+            }
+            
+            // Calculate bill details
+            let subtotal = 0;
+            const billItems = [];
+            
+            const rows = document.getElementById('itemsTable').getElementsByTagName('tbody')[0].rows;
+            for (let i = 0; i < rows.length; i++) {
+                const particulars = rows[i].querySelector('.particulars').value || 'Service';
+                const qty = parseFloat(rows[i].querySelector('.qty').value) || 0;
+                const rate = parseFloat(rows[i].querySelector('.rate').value) || 0;
+                const amount = qty * rate;
+                
+                subtotal += amount;
+                
+                billItems.push({
+                    sr: i + 1,
+                    particulars: particulars,
+                    qty: qty,
+                    rate: rate.toFixed(2),
+                    amount: amount.toFixed(2)
+                });
+            }
+            
+            const gst = subtotal * 0.18;
+            const total = subtotal + gst;
+            
+            // Update bill preview
+            document.getElementById('billCustomerName').textContent = customerName;
+            document.getElementById('billCustomerPhone').textContent = customerPhone;
+            document.getElementById('billVehicleNo').textContent = vehicleNo;
+            
+            document.getElementById('billNumber').textContent = 'BBP' + new Date().getFullYear() + billCounter.toString().padStart(4, '0');
+            document.getElementById('billDate').textContent = new Date().toLocaleDateString();
+            document.getElementById('billTime').textContent = new Date().toLocaleTimeString();
+            
+            document.getElementById('billSubtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('billGst').textContent = gst.toFixed(2);
+            document.getElementById('billTotal').textContent = total.toFixed(2);
+            
+            // Populate bill items table
+            const billItemsTable = document.getElementById('billItemsTable').getElementsByTagName('tbody')[0];
+            billItemsTable.innerHTML = '';
+            
+            billItems.forEach(item => {
+                const row = billItemsTable.insertRow();
+                row.innerHTML = `
+                    <td>${item.sr}</td>
+                    <td>${item.particulars}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.rate}</td>
+                    <td>${item.amount}</td>
+                `;
+            });
+            
+            // Show bill preview
+            document.getElementById('billPreview').style.display = 'block';
+            
+            // Scroll to bill preview
+            document.getElementById('billPreview').scrollIntoView({ behavior: 'smooth' });
+            
+            showNotification('Bill generated successfully');
+        }
+        
+        // Close bill preview
+        function closeBillPreview() {
+            document.getElementById('billPreview').style.display = 'none';
+            showNotification('Bill preview closed');
+        }
+        
+        // Download PDF
+        function downloadPDF() {
+            showNotification('Preparing PDF download...');
+            
+            // Simulate PDF download delay
+            setTimeout(() => {
+                // Add to bill history
+                const billTotal = document.getElementById('billTotal').textContent;
+                const billNumber = document.getElementById('billNumber').textContent;
+                const billDate = document.getElementById('billDate').textContent;
+                const customerName = document.getElementById('billCustomerName').textContent;
+                const customerPhone = document.getElementById('billCustomerPhone').textContent;
+                const vehicleNo = document.getElementById('billVehicleNo').textContent;
+                
+                const newBill = {
+                    id: Date.now(),
+                    billNumber: billNumber,
+                    date: billDate,
+                    customerName: customerName,
+                    customerPhone: customerPhone,
+                    vehicleNo: vehicleNo,
+                    total: billTotal,
+                    items: getBillItems()
+                };
+                
+                billHistory.unshift(newBill); // Add to beginning of array
+                
+                updateBillHistory();
+                saveToLocalStorage();
+                
+                // Increment bill counter for next bill
+                billCounter++;
+                localStorage.setItem('beeruBikeBillCounter', billCounter.toString());
+                
+                // Close bill preview
+                closeBillPreview();
+                
+                // Reset form
+                document.getElementById('customerName').value = '';
+                document.getElementById('customerPhone').value = '';
+                document.getElementById('vehicleNo').value = '';
+                
+                const itemsTable = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+                itemsTable.innerHTML = `
+                    <tr>
+                        <td>1</td>
+                        <td><input type="text" class="particulars" placeholder="Service/item name"></td>
+                        <td><input type="number" class="qty" placeholder="Qty" min="1' value="1"></td>
+                        <td><input type="number" class="rate" placeholder="Rate" min="0" value="0"></td>
+                        <td class="amount">0.00</td>
+                        <td class="action-cell">
+                            <button class="btn-danger action-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i> Remove</button>
+                        </td>
+                    </tr>
+                `;
+                
+                showNotification('Bill saved to history and PDF downloaded successfully');
+            }, 1500);
+        }
+        
+        // Get bill items for history
+        function getBillItems() {
+            const items = [];
+            const rows = document.getElementById('billItemsTable').getElementsByTagName('tbody')[0].rows;
+            
+            for (let i = 0; i < rows.length; i++) {
+                items.push({
+                    particulars: rows[i].cells[1].textContent,
+                    qty: rows[i].cells[2].textContent,
+                    rate: rows[i].cells[3].textContent,
+                    amount: rows[i].cells[4].textContent
+                });
+            }
+            
+            return items;
+        }
+        
+        // Share bill
+        function shareBill() {
+            showNotification('Sharing bill...');
+            // Simulate sharing delay
+            setTimeout(() => {
+                showNotification('Bill shared successfully');
+            }, 1500);
+        }
+        
+        // Update bill history table
+        function updateBillHistory() {
+            const historyTable = document.getElementById('billHistory').getElementsByTagName('tbody')[0];
+            historyTable.innerHTML = '';
+            
+            if (billHistory.length === 0) {
+                const row = historyTable.insertRow();
+                row.innerHTML = `
+                    <td colspan="5" style="text-align: center; padding: 20px;">
+                        No bill history found. Create your first bill!
+                    </td>
+                `;
+                return;
+            }
+            
+            billHistory.forEach((bill, index) => {
+                const row = historyTable.insertRow();
+                row.innerHTML = `
+                    <td>${bill.billNumber}</td>
+                    <td>${bill.date}</td>
+                    <td>${bill.customerName}</td>
+                    <td>₹${bill.total}</td>
+                    <td class="action-cell">
+                        <button class="btn-primary action-btn" onclick="viewBill(${index})"><i class="fas fa-eye"></i> View</button>
+                        <button class="btn-secondary action-btn" onclick="editBill(${index})"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn-danger action-btn" onclick="deleteBill(${index})"><i class="fas fa-trash"></i> Delete</button>
+                        <button class="btn-success action-btn" onclick="shareBillFromHistory(${index})"><i class="fas fa-share-alt"></i> Share</button>
+                        <button class="btn-primary action-btn" onclick="downloadBillFromHistory(${index})"><i class="fas fa-download"></i> PDF</button>
+                    </td>
+                `;
+            });
+        }
+        
+        // View bill from history
+        function viewBill(index) {
+            const bill = billHistory[index];
+            showNotification(`Viewing bill ${bill.billNumber}`);
+            
+            // Populate the bill preview with historical data
+            document.getElementById('billCustomerName').textContent = bill.customerName;
+            document.getElementById('billCustomerPhone').textContent = bill.customerPhone || "Not provided";
+            document.getElementById('billVehicleNo').textContent = bill.vehicleNo || "Not provided";
+            
+            document.getElementById('billNumber').textContent = bill.billNumber;
+            document.getElementById('billDate').textContent = bill.date;
+            document.getElementById('billTime').textContent = "From history";
+            
+            // Calculate values for display
+            const total = parseFloat(bill.total);
+            const subtotal = total / 1.18;
+            const gst = total - subtotal;
+            
+            document.getElementById('billSubtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('billGst').textContent = gst.toFixed(2);
+            document.getElementById('billTotal').textContent = total.toFixed(2);
+            
+            // Populate bill items table
+            const billItemsTable = document.getElementById('billItemsTable').getElementsByTagName('tbody')[0];
+            billItemsTable.innerHTML = '';
+            
+            if (bill.items) {
+                bill.items.forEach((item, i) => {
+                    const row = billItemsTable.insertRow();
+                    row.innerHTML = `
+                        <td>${i + 1}</td>
+                        <td>${item.particulars}</td>
+                        <td>${item.qty}</td>
+                        <td>${item.rate}</td>
+                        <td>${item.amount}</td>
+                    `;
+                });
+            }
+            
+            // Show bill preview
+            document.getElementById('billPreview').style.display = 'block';
+            
+            // Scroll to bill preview
+            document.getElementById('billPreview').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Edit bill from history
+        function editBill(index) {
+            const bill = billHistory[index];
+            showNotification(`Editing bill ${bill.billNumber}`);
+            
+            // Open edit modal
+            document.getElementById('editBillModal').style.display = 'flex';
+            
+            // Populate edit form
+            const editContent = document.getElementById('editBillContent');
+            editContent.innerHTML = `
+                <div class="form-group">
+                    <div class="input-group">
+                        <label for="editCustomerName">Customer Name</label>
+                        <input type="text" id="editCustomerName" value="${bill.customerName}">
+                    </div>
+                    <div class="input-group">
+                        <label for="editBillDate">Date</label>
+                        <input type="text" id="editBillDate" value="${bill.date}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="input-group">
+                        <label for="editCustomerPhone">Phone</label>
+                        <input type="text" id="editCustomerPhone" value="${bill.customerPhone || ''}">
+                    </div>
+                    <div class="input-group">
+                        <label for="editVehicleNo">Vehicle No</label>
+                        <input type="text" id="editVehicleNo" value="${bill.vehicleNo || ''}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="input-group">
+                        <label for="editBillTotal">Total Amount (₹)</label>
+                        <input type="number" id="editBillTotal" value="${bill.total}">
+                    </div>
+                </div>
+                <div class="bill-actions">
+                    <button class="btn-success" onclick="saveEditedBill(${index})"><i class="fas fa-save"></i> Save Changes</button>
+                    <button class="btn-danger" onclick="closeEditModal()"><i class="fas fa-times"></i> Cancel</button>
+                </div>
+            `;
+        }
+        
+        // Close edit modal
+        function closeEditModal() {
+            document.getElementById('editBillModal').style.display = 'none';
+        }
+        
+        // Save edited bill
+        function saveEditedBill(index) {
+            const customerName = document.getElementById('editCustomerName').value;
+            const date = document.getElementById('editBillDate').value;
+            const customerPhone = document.getElementById('editCustomerPhone').value;
+            const vehicleNo = document.getElementById('editVehicleNo').value;
+            const total = document.getElementById('editBillTotal').value;
+            
+            // Update bill in history
+            billHistory[index].customerName = customerName;
+            billHistory[index].date = date;
+            billHistory[index].customerPhone = customerPhone;
+            billHistory[index].vehicleNo = vehicleNo;
+            billHistory[index].total = total;
+            
+            // Update history table
+            updateBillHistory();
+            saveToLocalStorage();
+            
+            // Close modal
+            closeEditModal();
+            
+            showNotification('Bill updated successfully');
+        }
+        
+        // Delete bill from history
+        function deleteBill(index) {
+            if (confirm('Are you sure you want to delete this bill?')) {
+                billHistory.splice(index, 1);
+                updateBillHistory();
+                saveToLocalStorage();
+                showNotification('Bill deleted successfully');
+            }
+        }
+        
+        // Share bill from history
+        function shareBillFromHistory(index) {
+            const bill = billHistory[index];
+            showNotification(`Sharing bill ${bill.billNumber}`);
+        }
+        
+        // Download bill from history
+        function downloadBillFromHistory(index) {
+            const bill = billHistory[index];
+            showNotification(`Downloading PDF for bill ${bill.billNumber}`);
+        }
+        
+        // Initialize with data from localStorage
+        window.onload = function() {
+            loadFromLocalStorage();
+            
+            // Show welcome notification
+            setTimeout(() => {
+                showNotification('Welcome to Beeru Bike Point Billing System. Your bill history is saved locally.');
+            }, 1000);
+        };
+    </script>
 </body>
 </html>
